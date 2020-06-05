@@ -45,4 +45,4 @@ def get_secret(secret_name, region_name):
             return json.loads(secret_value['SecretString'])
             
         else:
-            return json.loads(base64.b64decode(secret_value['SecretBinary'])
+            return json.loads(base64.b64decode(secret_value['SecretBinary']))
