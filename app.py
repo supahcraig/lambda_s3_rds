@@ -1,4 +1,3 @@
-#import sys
 import logging
 import pymysql
 import boto3
@@ -9,12 +8,13 @@ logger.setLevel(logging.INFO)
 
 s3 = boto3.client('s3')
 
-#rds_host = 'mysqlforlambdatest.cevfxcwql3rj.us-east-1.rds.amazonaws.com'  # RDS endpoint
-rds_host = 'cnelson-rds-mysql-proxy.proxy-cevfxcwql3rj.us-east-1.rds.amazonaws.com'  # proxy endpoint
+#rds_host = 'YOUR.RDS.ENDPOINT'  # RDS endpoint
+rds_host = 'YOUR.RDS-PROXY.ENDPOINT' # Proxy endpoint
 
-secret = get_secret(secret_name='cnelson-mysql-secret', region_name='us-east-1')
+secret = get_secret(secret_name='YOUR.SECRET', region_name='YOUR.REGION')
 
 try:
+    logger.info(f'Trying to connect to MySQL instance...')
     conn = pymysql.connect(rds_host, 
                            user=secret['username'], 
                            passwd=secret['password'], 
@@ -37,9 +37,14 @@ def handler(event, context):
     logger.info(f'bucket = {bucket}')
     logger.info(f'key = {key}')
 
+    logger.info(f'Fetching S3 bucket object {bucket}/{key}')
     obj = s3.get_object(Bucket=bucket, Key=key)
+    logger.info(f'SUCCESS: Fetched S3 bucket object {bucket}/{key}')
+
+    logger.info(f'Reading S3 bucket object {bucket}/{key}')
     rows = obj['Body'].read().decode('utf-8').split('\n')
-    logging.info(f'The object has {len(rows)} rows.')
+    logger.info(f'SUCCESS: Read S3 bucket object {bucket}/{key}')
+    logger.info(f'The object has {len(rows)} rows.')
     # seems to end up with an extra row, not sure why
 
     insert_count = 0
@@ -62,7 +67,8 @@ def handler(event, context):
                 
 
     conn.commit()
-    logging.info(f'Added {insert_count} items to RDS MySQL table.')
+    logging.info(f'SUCCESS: Added {insert_count} items to RDS MySQL table.')
+    conn.close()
 
     return 200
 
