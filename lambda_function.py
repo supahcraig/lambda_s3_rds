@@ -29,7 +29,7 @@ except pymysql.MySQLError as e:
 logger.info("SUCCESS: Connection to RDS MySQL instance succeeded.")     
 
 
-def handler(event, context):
+def lambda_handler(event, context):
 
     bucket = event['Records'][0]['s3']['bucket']['name']
     key = event['Records'][0]['s3']['object']['key']
@@ -68,7 +68,7 @@ def handler(event, context):
 
     conn.commit()
     logging.info(f'SUCCESS: Added {insert_count} items to RDS MySQL table.')
-    conn.close()
+    conn.close() # unsure how RDS proxy handles the connection close
 
     return 200
 
