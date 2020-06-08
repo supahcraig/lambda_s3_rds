@@ -8,10 +8,11 @@ logger.setLevel(logging.INFO)
 
 s3 = boto3.client('s3')
 
-#rds_host = 'YOUR.RDS.ENDPOINT'  # RDS endpoint
-rds_host = 'YOUR.RDS-PROXY.ENDPOINT' # Proxy endpoint
+#rds_host = 'electricboogaloo-lambda-test-mysql.cevfxcwql3rj.us-east-1.rds.amazonaws.com'  # RDS endpoint
+rds_host = 'electricboogaloo-lambda-test-rds-proxy.proxy-cevfxcwql3rj.us-east-1.rds.amazonaws.com' # Proxy endpoint
 
-secret = get_secret(secret_name='YOUR.SECRET', region_name='YOUR.REGION')
+secret = get_secret(secret_name='electricboogaloo-lambda-test-RDS-secret', region_name='us-east-1')
+logger.info(f'here is the secret info==> {secret}')
 
 try:
     logger.info(f'Trying to connect to MySQL instance...')
@@ -42,30 +43,34 @@ def lambda_handler(event, context):
     logger.info(f'SUCCESS: Fetched S3 bucket object {bucket}/{key}')
 
     logger.info(f'Reading S3 bucket object {bucket}/{key}')
-    rows = obj['Body'].read().decode('utf-8').split('\n')
+    rows = (line.decode('utf-8') for line in obj['Body'].iter_lines())
     logger.info(f'SUCCESS: Read S3 bucket object {bucket}/{key}')
-    logger.info(f'The object has {len(rows)} rows.')
-    # seems to end up with an extra row, not sure why
+
+
+    column_names = ['playerID','yearID','stint','teamID','lgID',
+                    'G','AB','R','H','2B','3B','HR','RBI','SB','CS',
+                    'BB','SO','IBB','HBP','SH','SF','GIDP']
+
+    bind_placeholders = ', '.join('%(' + column + ')s' for column in column_names)
 
     insert_count = 0
 
     with conn.cursor() as cur:
-        cur.execute('delete from players')  # clean up the table first
+        cur.execute('delete from batting')  # clean up the table first
 
-        insert_sql = 'insert into players (player_id, year_id, team_id) values (%s, %s, %s)'
+        insert_sql = f'insert into batting ({", " .join(column_names)}) values ({bind_placeholders})'
+        logging.debug(insert_sql)
 
-        for row in rows:
-            parsed_row = row.split(',')
-            
-            try:
-                cur.execute(insert_sql, (parsed_row[0], parsed_row[1], parsed_row[3]) )
+        for row_count, row in enumerate(rows):
+            logging.debug(row)
+
+            if row_count > 0:
+                #skip the header row
+                parsed_row = row.split(',')
+
+                cur.execute(insert_sql, dict(zip(column_names, parsed_row)))
                 insert_count += 1
-    
-            except IndexError as e:
-                logging.error(e)
-                # let this exception pass...need to understand why there's an extra row being read
-                
-
+        
     conn.commit()
     logging.info(f'SUCCESS: Added {insert_count} items to RDS MySQL table.')
     conn.close() # unsure how RDS proxy handles the connection close
