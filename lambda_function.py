@@ -8,11 +8,10 @@ logger.setLevel(logging.INFO)
 
 s3 = boto3.client('s3')
 
-#rds_host = 'electricboogaloo-lambda-test-mysql.cevfxcwql3rj.us-east-1.rds.amazonaws.com'  # RDS endpoint
-rds_host = 'electricboogaloo-lambda-test-rds-proxy.proxy-cevfxcwql3rj.us-east-1.rds.amazonaws.com' # Proxy endpoint
+#rds_host = 'YOUR_RDS_ENDPOINT'  # RDS endpoint
+rds_host = 'YOUR_RDS_PROXY_ENDPOINT' # Proxy endpoint
 
-secret = get_secret(secret_name='electricboogaloo-lambda-test-RDS-secret', region_name='us-east-1')
-logger.info(f'here is the secret info==> {secret}')
+secret = get_secret(secret_name='YOUR_SECRET', region_name='YOUR_REGION')
 
 try:
     logger.info(f'Trying to connect to MySQL instance...')
