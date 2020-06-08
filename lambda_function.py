@@ -66,10 +66,13 @@ def lambda_handler(event, context):
             if row_count > 0:
                 #skip the header row
                 parsed_row = row.split(',')
+                
+                # change empty strings to null when they get inserted
+                scrubbed_row = [x if x != '' else None for x in parsed_row]
+                logging.debug(scrubbed_row)
 
-                cur.execute(insert_sql, dict(zip(column_names, parsed_row)))
-                insert_count += 1
-        
+                cur.execute(insert_sql, dict(zip(column_names, scrubbed_row)))
+                insert_count += 1        
     conn.commit()
     logging.info(f'SUCCESS: Added {insert_count} items to RDS MySQL table.')
     conn.close() # unsure how RDS proxy handles the connection close
