@@ -29,7 +29,6 @@ except pymysql.MySQLError as e:
     exit(99)
 
 
-
 def lambda_handler(event, context):
 
     bucket = event['Records'][0]['s3']['bucket']['name']
