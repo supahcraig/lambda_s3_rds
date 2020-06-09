@@ -77,6 +77,7 @@ def lambda_handler(event, context):
                 row_batch.append(dict(zip(column_names, scrubbed_row)))
                 
                 if len(row_batch) == 5000:
+                    # Once the batch gets to 5k rows send to the database
                     cur.executemany(insert_sql, row_batch)
                     logging.info(f'Inserted {insert_count} records...')
                     row_batch = []
