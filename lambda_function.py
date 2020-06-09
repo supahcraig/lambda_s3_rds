@@ -21,12 +21,13 @@ try:
                            db=secret['dbname'], 
                            connect_timeout=10)
 
+    logger.info("SUCCESS: Connection to RDS MySQL instance succeeded.")     
+
 except pymysql.MySQLError as e:
     logger.error('Error:  Unexpected error:  could not connect to MySQL instance.')
     logger.error(e)
     exit(99)
 
-logger.info("SUCCESS: Connection to RDS MySQL instance succeeded.")     
 
 
 def lambda_handler(event, context):
@@ -43,6 +44,7 @@ def lambda_handler(event, context):
 
     logger.info(f'Reading S3 bucket object {bucket}/{key}')
     rows = (line.decode('utf-8') for line in obj['Body'].iter_lines())
+    # .iter_lines() is a generator
     logger.info(f'SUCCESS: Read S3 bucket object {bucket}/{key}')
 
 
@@ -53,11 +55,12 @@ def lambda_handler(event, context):
     bind_placeholders = ', '.join('%(' + column + ')s' for column in column_names)
 
     insert_count = 0
+    row_batch = []
 
     with conn.cursor() as cur:
         cur.execute('delete from batting')  # clean up the table first
 
-        insert_sql = f'insert into batting ({", " .join(column_names)}) values ({bind_placeholders})'
+        insert_sql = f'insert into batting ({", ".join(column_names)}) values ({bind_placeholders})'
         logging.debug(insert_sql)
 
         for row_count, row in enumerate(rows):
@@ -71,13 +74,21 @@ def lambda_handler(event, context):
                 scrubbed_row = [x if x != '' else None for x in parsed_row]
                 logging.debug(scrubbed_row)
 
-                cur.execute(insert_sql, dict(zip(column_names, scrubbed_row)))
-                insert_count += 1        
+                row_batch.append(dict(zip(column_names, scrubbed_row)))
+                
+                if len(row_batch) == 5000:
+                    cur.executemany(insert_sql, row_batch)
+                    logging.info(f'Inserted {insert_count} records...')
+                    row_batch = []
+
+                insert_count += 1
+        
+        # insert the final residual batch
+        cur.executemany(insert_sql, row_batch)
+        logging.info(f'Inserted {insert_count} records...')
+        row_batch = []
+        
     conn.commit()
     logging.info(f'SUCCESS: Added {insert_count} items to RDS MySQL table.')
-    conn.close() # unsure how RDS proxy handles the connection close
-
-    return 200
-
-
-
+    conn.close()
+    
